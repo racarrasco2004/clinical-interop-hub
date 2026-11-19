@@ -1,0 +1,7 @@
+MSH|^~\&|LIS|CLINICA_DEMO|MINI_FHIR|API|20261118091000||ORU^R01|MSG0002|P|2.5
+PID|1||12345678^^^HOSPITAL_DEMO^MR||Pérez^Ana^María||19900512|F|||Av. Siempre Viva 123^^Santiago^RM^8320000^CL||+56212345678^PRN^PH
+PV1|1|O|CONS^12||||||||||||||||V0002
+OBR|1|ORD001|LAB001|8716-3^Signos vitales^LN|||20261118090000
+OBX|1|NM|8867-4^Frecuencia cardiaca^LN||72|/min|60-100|N|||F|||20261118090500
+OBX|2|NM|8310-5^Temperatura corporal^LN||38.4|Cel|36.1-37.2|H|||F
+OBX|3|ST|8661-1^Motivo de consulta^LN||Fiebre y tos desde hace 3 dias||||||F

@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard clínico · Clinical Interop Hub</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11, 11, 11, .10); --wash: rgba(11, 11, 11, .05);
+    --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a;           /* categóricos 1-3: urgencia, ambulatorio, hospitalización */
+    --ord-1: #86b6ef; --ord-2: #5598e7; --ord-3: #2a78d6; --ord-4: #1c5cab; --ord-5: #104281;   /* rampa ordinal (edad) */
+    --seq-0: #e1e0d9; --seq-1: #cde2fb; --seq-2: #86b6ef; --seq-3: #3987e5; --seq-4: #1c5cab; --seq-5: #0d366b;
+    --meter-track: #cde2fb;
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --delta-good: #006300; --delta-bad: #b32d2d;
+    --accent: #2a78d6; --accent-ink: #ffffff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19;
+      --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, .10); --wash: rgba(255, 255, 255, .06);
+      --c1: #3987e5; --c2: #d95926; --c3: #199e70;
+      --ord-1: #184f95; --ord-2: #256abf; --ord-3: #3987e5; --ord-4: #6da7ec; --ord-5: #9ec5f4;
+      --seq-0: #2c2c2a; --seq-1: #0d366b; --seq-2: #184f95; --seq-3: #2a78d6; --seq-4: #6da7ec; --seq-5: #9ec5f4;
+      --meter-track: #0d366b;
+      --delta-good: #0ca30c; --delta-bad: #f08080;
+      --accent: #3987e5; --accent-ink: #ffffff;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, .10); --wash: rgba(255, 255, 255, .06);
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70;
+    --ord-1: #184f95; --ord-2: #256abf; --ord-3: #3987e5; --ord-4: #6da7ec; --ord-5: #9ec5f4;
+    --seq-0: #2c2c2a; --seq-1: #0d366b; --seq-2: #184f95; --seq-3: #2a78d6; --seq-4: #6da7ec; --seq-5: #9ec5f4;
+    --meter-track: #0d366b;
+    --delta-good: #0ca30c; --delta-bad: #f08080;
+    --accent: #3987e5; --accent-ink: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-size: 14px; line-height: 1.45; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--ink2); font-size: 13px; }
+  nav { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+
+  .btn { background: var(--surface); border: 1px solid var(--axis); border-radius: 8px; padding: 6px 12px; }
+  .btn:hover:not(:disabled) { background: var(--wash); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+
+  .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 10px 12px; margin-bottom: 14px; background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; }
+  .filters .group { display: flex; align-items: center; gap: 8px; }
+  .filters label, .filters .lbl { color: var(--ink2); font-size: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 8px; overflow: hidden; }
+  .seg button { background: transparent; border: 0; padding: 6px 12px; border-right: 1px solid var(--axis); }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: var(--wash); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .seg button[aria-pressed="true"]::before { content: "✓ "; font-weight: 700; }
+  input[type="number"] { width: 72px; background: var(--page); border: 1px solid var(--axis); border-radius: 8px; padding: 5px 8px; }
+  .filters .spacer { flex: 1; }
+  .status { color: var(--ink2); font-size: 12px; }
+
+  main { transition: opacity .15s; }
+  main.loading { opacity: .55; }
+
+  .banner { padding: 10px 12px; border-radius: 10px; background: var(--wash); color: var(--ink2); margin-bottom: 14px; font-size: 13px; }
+  .banner.err { color: var(--delta-bad); border: 1px solid var(--delta-bad); background: transparent; }
+  .empty { text-align: center; padding: 56px 16px; background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; }
+  .empty h2 { margin: 0 0 6px; font-size: 18px; } .empty p { margin: 0 auto 16px; color: var(--ink2); max-width: 520px; }
+
+  .kpis { display: grid; grid-template-columns: 1.35fr repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .tile .label { color: var(--ink2); font-size: 13px; }
+  .tile .value { font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+  .tile.hero .value { font-size: 56px; line-height: 1.05; }
+  .tile .value small { font-size: 14px; font-weight: 500; color: var(--ink2); letter-spacing: 0; margin-left: 3px; }
+  .tile .note { color: var(--ink2); font-size: 12px; }
+  .delta { font-size: 12px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .delta.good { color: var(--delta-good); } .delta.bad { color: var(--delta-bad); } .delta.neutral, .delta.none { color: var(--ink2); }
+  .meter { height: 8px; border-radius: 99px; background: var(--meter-track); overflow: hidden; margin: 6px 0 2px; }
+  .meter i { display: block; height: 100%; border-radius: 99px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+  .badge.warning { color: var(--ink); } .badge.warning .ico { color: var(--warning); }
+  .badge.critical { color: var(--delta-bad); } .badge.good { color: var(--delta-good); }
+  .spark { height: 36px; margin-top: auto; }
+
+  .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+  .card { grid-column: span 6; background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card.wide { grid-column: span 12; }
+  .card.third { grid-column: span 4; }
+  .card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .card h2 { font-size: 15px; margin: 0; }
+  .card .desc { color: var(--ink2); font-size: 12px; margin-top: 2px; }
+  .tbtn { background: transparent; border: 1px solid var(--axis); border-radius: 7px; padding: 3px 9px; font-size: 12px; color: var(--ink2); white-space: nowrap; }
+  .tbtn:hover { background: var(--wash); } .tbtn[aria-pressed="true"] { background: var(--wash); color: var(--ink); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 6px; font-size: 12px; color: var(--ink2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 16px; height: 2px; border-radius: 2px; }
+  .viz { width: 100%; position: relative; }
+  .viz svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .viz svg text { font-family: inherit; }
+  .tableview { max-height: 280px; overflow: auto; border: 1px solid var(--grid); border-radius: 8px; }
+  .tableview[hidden], .viz[hidden] { display: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--surface); color: var(--ink2); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .rb { display: grid; grid-template-columns: var(--lw, 45%) minmax(0, 1fr); align-items: center; gap: 10px; padding: 4px 2px; border-radius: 6px; }
+  .rb:hover, .rb:focus-visible { background: var(--wash); }
+  .rb-l { font-size: 12px; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rb-t { position: relative; height: 16px; }
+  .rb-b { height: 16px; border-radius: 0 4px 4px 0; background: var(--c1); transition: filter .1s; }
+  .rb:hover .rb-b, .rb:focus-visible .rb-b { filter: brightness(1.15); }
+  .rb-v { position: absolute; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .hot { filter: brightness(1.15); }
+  .heat-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2); margin-top: 8px; flex-wrap: wrap; }
+  .heat-legend i { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .alerts td .lvl { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--delta-bad); }
+  .alerts-empty { color: var(--ink2); padding: 16px 4px; }
+
+  #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); max-width: 260px; }
+  #tip[hidden] { display: none; }
+  #tip .t { color: var(--ink2); margin-bottom: 4px; }
+  #tip .r { display: flex; align-items: center; gap: 8px; line-height: 1.6; }
+  #tip .k { width: 12px; height: 2px; border-radius: 2px; flex: none; }
+  #tip .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  #tip .n { color: var(--ink2); }
+
+  details { margin-top: 14px; background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 10px 16px; color: var(--ink2); font-size: 13px; }
+  details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+  details ul { margin: 8px 0 0; padding-left: 18px; } details li { margin: 4px 0; }
+  footer { color: var(--ink2); font-size: 12px; margin: 14px 0 6px; }
+
+  @media (max-width: 1100px) {
+    .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .tile.hero { grid-column: 1 / -1; }
+    .card, .card.third { grid-column: span 12; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 12px; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tile.hero .value { font-size: 48px; } nav { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Dashboard clínico</h1>
+      <div class="sub">Clinical Interop Hub · indicadores calculados en vivo desde los recursos FHIR</div>
+    </div>
+    <nav>
+      <a href="/viewer">Visor DICOM</a>
+      <a href="/docs" target="_blank" rel="noopener">API (Swagger)</a>
+      <button class="btn" id="themeBtn" type="button" aria-label="Cambiar tema de color">Tema: auto</button>
+    </nav>
+  </header>
+
+  <section class="filters" aria-label="Filtros">
+    <div class="group" role="group" aria-label="Período">
+      <span class="lbl">Período</span>
+      <div class="seg" id="period">
+        <button type="button" data-days="7" aria-pressed="false">7 días</button>
+        <button type="button" data-days="30" aria-pressed="true">30 días</button>
+        <button type="button" data-days="90" aria-pressed="false">90 días</button>
+      </div>
+    </div>
+    <div class="group">
+      <label for="cap">Camas totales</label>
+      <input id="cap" type="number" min="1" max="5000" value="60">
+    </div>
+    <span class="spacer"></span>
+    <span class="status" id="status" role="status"></span>
+    <button class="btn primary" id="seedBtn" type="button">Generar datos de demostración</button>
+    <button class="btn" id="clearBtn" type="button">Borrar demo</button>
+  </section>
+
+  <div id="banner"></div>
+
+  <section class="empty" id="empty" hidden>
+    <h2>Todavía no hay datos para mostrar</h2>
+    <p>Genera datos ficticios de un hospital imaginario (≈ 4 meses de atenciones, diagnósticos, signos vitales e imágenes) o carga tus propios mensajes HL7 y DICOM.</p>
+    <button class="btn primary" id="seedBtn2" type="button">Generar datos de demostración</button>
+  </section>
+
+  <main id="content" hidden>
+    <section class="kpis" id="kpis" aria-label="Indicadores principales"></section>
+
+    <section class="grid">
+      <article class="card wide" data-chart="daily">
+        <header><div><h2>Atenciones por día</h2><div class="desc" id="d-daily">Urgencia, ambulatorio y hospitalización</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="legend" id="lg-daily"></div>
+        <div class="viz" id="v-daily"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card" data-chart="occ">
+        <header><div><h2>Ocupación de camas</h2><div class="desc">Hospitalizados a las 12:00 sobre camas totales</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-occ"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card" data-chart="heat">
+        <header><div><h2>Llegadas a urgencias por hora</h2><div class="desc">Día de la semana y hora de llegada, período seleccionado</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-heat"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card third" data-chart="wait">
+        <header><div><h2>Espera en urgencias</h2><div class="desc" id="d-wait">Minutos desde la llegada hasta ser atendido</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-wait"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card third" data-chart="stay">
+        <header><div><h2>Estadía hospitalaria</h2><div class="desc">Días de hospitalización de las altas del período</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-stay"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card third" data-chart="age">
+        <header><div><h2>Edad de los pacientes atendidos</h2><div class="desc">Pacientes distintos por tramo (años)</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-age"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card" data-chart="dx">
+        <header><div><h2>Principales diagnósticos</h2><div class="desc">Condition (CIE-10) registradas en el período</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-dx"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card" data-chart="img">
+        <header><div><h2>Estudios de imagen</h2><div class="desc">ImagingStudy por modalidad en el período</div></div><button class="tbtn" type="button" aria-pressed="false">Ver tabla</button></header>
+        <div class="viz" id="v-img"></div><div class="tableview" hidden></div>
+      </article>
+
+      <article class="card wide">
+        <header><div><h2>Alertas: signos vitales críticos</h2><div class="desc">Observation con interpretación crítica (HH / LL) en los últimos 7 días</div></div></header>
+        <div id="alerts"></div>
+      </article>
+    </section>
+
+    <details>
+      <summary>¿Cómo se calcula cada indicador?</summary>
+      <ul>
+        <li><b>Atenciones:</b> Encounter que empezaron en el período (urgencia EMER, ambulatorio AMB u hospitalización IMP).</li>
+        <li><b>Ocupación:</b> hospitalizados a las 12:00 de cada día dividido por las camas totales. “Ahora” cuenta a los que siguen internados.</li>
+        <li><b>Estadía promedio:</b> días entre inicio y fin de las hospitalizaciones que terminaron en el período.</li>
+        <li><b>Espera en urgencias:</b> minutos entre el estado “arrived” y “in-progress” de Encounter.statusHistory. La mediana es el valor del medio (no la afectan los casos extremos); P90 es el valor bajo el cual está el 90 % de los pacientes.</li>
+        <li><b>Reingreso a 30 días:</b> de las altas del período, porcentaje de pacientes con otra hospitalización dentro de los 30 días siguientes.</li>
+        <li><b>Comparación:</b> contra el período anterior de igual largo. Solo aparece si hay datos de ese período.</li>
+      </ul>
+    </details>
+    <footer id="footer"></footer>
+  </main>
+</div>
+<div id="tip" hidden role="presentation"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const WEEKDAYS_LONG = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+  const nf0 = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+  const fmt0 = (n) => nf0.format(n), fmt1 = (n) => nf1.format(n);
+  const CLASS = { EMER: { name: 'Urgencia', color: 'var(--c1)' }, AMB: { name: 'Ambulatorio', color: 'var(--c2)' }, IMP: { name: 'Hospitalización', color: 'var(--c3)' } };
+
+  const state = { days: 30, capacity: 60, data: null, seq: 0 };
+  const store = {
+    get(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } },
+  };
+
+  // ---------- DOM ----------
+  function el(tag, props = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+    }
+    for (const kid of kids) if (kid != null) n.append(kid);
+    return n;
+  }
+  function svg(tag, attrs = {}, ...kids) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'text') n.textContent = v; else if (k === 'style') n.setAttribute('style', v); else n.setAttribute(k, v);
+    }
+    for (const kid of kids) if (kid != null) n.append(kid);
+    return n;
+  }
+
+  // ---------- Tooltip (un solo elemento; usa textContent) ----------
+  const tip = $('#tip');
+  function showTip(title, rows, x, y) {
+    const box = [el('div', { class: 't', text: title })];
+    for (const r of rows) {
+      const row = el('div', { class: 'r' });
+      if (r.color) row.append(el('span', { class: 'k', style: `background:${r.color}` }));
+      row.append(el('span', { class: 'v', text: r.value }), el('span', { class: 'n', text: r.name || '' }));
+      box.push(row);
+    }
+    tip.replaceChildren(...box); tip.hidden = false;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = `${Math.max(8, Math.min(x + 14, innerWidth - w - 8))}px`;
+    tip.style.top = `${y - h - 12 > 8 ? y - h - 12 : y + 16}px`;
+  }
+  const hideTip = () => { tip.hidden = true; };
+  function focusPoint(node) { const r = node.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+
+  // ---------- Escalas ----------
+  function niceScale(max, target = 4) {
+    if (!(max > 0)) return { max: 1, ticks: [0, 1] };
+    const raw = max / target, exp = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((f) => f * exp).find((s) => s >= raw);
+    const top = Math.ceil(max / step) * step, ticks = [];
+    for (let v = 0; v <= top + step / 2; v += step) ticks.push(+v.toFixed(6));
+    return { max: top, ticks };
+  }
+  function parseDay(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+  const dayLabel = (s) => { const d = parseDay(s); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+  const longDay = (s) => { const d = parseDay(s); return `${WEEKDAYS_LONG[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+
+  // ---------- Gráfico de líneas ----------
+  function lineChart(host, cfg) {
+    host.replaceChildren();
+    const W = Math.max(280, host.clientWidth), H = cfg.height || 250;
+    const wide = W >= 560 && cfg.endLabels;
+    const m = { l: 40, r: wide ? 112 : 24, t: 14, b: 28 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b, n = cfg.labels.length;
+    const all = cfg.series.flatMap((s) => s.values).concat(cfg.ref ? [cfg.ref.value] : []);
+    const sc = niceScale(Math.max(...all, cfg.minMax || 0), 4);
+    const X = (i) => m.l + (n > 1 ? (pw * i) / (n - 1) : pw / 2);
+    const Y = (v) => m.t + ph - (v / sc.max) * ph;
+
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': cfg.aria, tabindex: '0' });
+    for (const t of sc.ticks) {
+      s.append(svg('line', { x1: m.l, x2: m.l + pw, y1: Y(t), y2: Y(t), style: `stroke:${t === 0 ? 'var(--axis)' : 'var(--grid)'};stroke-width:1` }));
+      s.append(svg('text', { x: m.l - 8, y: Y(t) + 4, 'text-anchor': 'end', 'font-size': 11, style: 'fill:var(--ink2)', text: cfg.yFmt ? cfg.yFmt(t) : fmt0(t) }));
+    }
+    const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / 78))));
+    for (let i = 0; i < n; i += every) {
+      s.append(svg('text', { x: X(i), y: H - 8, 'text-anchor': i === 0 ? 'start' : 'middle', 'font-size': 11, style: 'fill:var(--ink2)', text: dayLabel(cfg.labels[i]) }));
+    }
+    if (cfg.ref) {
+      s.append(svg('line', { x1: m.l, x2: m.l + pw, y1: Y(cfg.ref.value), y2: Y(cfg.ref.value), style: 'stroke:var(--warning);stroke-width:1.5' }));
+      s.append(svg('text', { x: m.l + pw - 4, y: Y(cfg.ref.value) - 5, 'text-anchor': 'end', 'font-size': 11, style: 'fill:var(--ink2)', text: cfg.ref.label }));
+    }
+    const path = (vals) => vals.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+    for (const sr of cfg.series) {
+      if (cfg.area) s.append(svg('path', { d: `${path(sr.values)}L${X(n - 1)},${Y(0)}L${X(0)},${Y(0)}Z`, style: `fill:${sr.color};opacity:.10` }));
+      s.append(svg('path', { d: path(sr.values), fill: 'none', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', style: `stroke:${sr.color}` }));
+      s.append(svg('circle', { cx: X(n - 1), cy: Y(sr.values[n - 1]), r: 4, 'stroke-width': 2, style: `fill:${sr.color};stroke:var(--surface)` }));
+    }
+    if (wide) {  // etiquetas directas al final de cada línea, solo si no chocan
+      const ends = cfg.series.map((sr) => ({ sr, y: Y(sr.values[n - 1]) })).sort((a, b) => a.y - b.y);
+      if (ends.every((e, i) => i === 0 || e.y - ends[i - 1].y >= 14)) {
+        for (const e of ends) s.append(svg('text', { x: X(n - 1) + 10, y: e.y + 4, 'font-size': 12, style: 'fill:var(--ink2)', text: cfg.endText ? cfg.endText(e.sr) : e.sr.name }));
+      }
+    }
+    // Cruz y tooltip
+    const cross = svg('line', { y1: m.t, y2: m.t + ph, style: 'stroke:var(--ink2);stroke-width:1', visibility: 'hidden' });
+    const dots = cfg.series.map((sr) => svg('circle', { r: 4, 'stroke-width': 2, style: `fill:${sr.color};stroke:var(--surface)`, visibility: 'hidden' }));
+    s.append(cross, ...dots);
+    const hit = svg('rect', { x: m.l, y: m.t, width: pw, height: ph, fill: 'transparent' });
+    s.append(hit);
+    let cur = n - 1;
+    const at = (i, cx, cy) => {
+      cur = Math.max(0, Math.min(n - 1, i));
+      cross.setAttribute('x1', X(cur)); cross.setAttribute('x2', X(cur)); cross.setAttribute('visibility', 'visible');
+      cfg.series.forEach((sr, k) => { dots[k].setAttribute('cx', X(cur)); dots[k].setAttribute('cy', Y(sr.values[cur])); dots[k].setAttribute('visibility', 'visible'); });
+      const rect = s.getBoundingClientRect(), px = cx ?? rect.left + (X(cur) / W) * rect.width, py = cy ?? rect.top + rect.height * 0.3;
+      showTip(longDay(cfg.labels[cur]), cfg.series.map((sr) => ({ color: sr.color, value: cfg.tipFmt(sr.values[cur]), name: sr.name })), px, py);
+    };
+    const leave = () => { cross.setAttribute('visibility', 'hidden'); dots.forEach((d) => d.setAttribute('visibility', 'hidden')); hideTip(); };
+    hit.addEventListener('pointermove', (e) => {
+      const r = s.getBoundingClientRect(), x = ((e.clientX - r.left) / r.width) * W;
+      at(Math.round(((x - m.l) / pw) * (n - 1)), e.clientX, e.clientY);
+    });
+    hit.addEventListener('pointerleave', leave);
+    s.addEventListener('blur', leave);
+    s.addEventListener('focus', () => at(n - 1));
+    s.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { at(cur - 1); e.preventDefault(); } else if (e.key === 'ArrowRight') { at(cur + 1); e.preventDefault(); }
+    });
+    host.append(s);
+  }
+
+  // ---------- Columnas (histogramas y tramos) ----------
+  function columns(host, items, cfg) {
+    host.replaceChildren();
+    const W = Math.max(240, host.clientWidth), H = 210, m = { l: 6, r: 6, t: 24, b: 30 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b, max = Math.max(1, ...items.map((i) => i.count));
+    const slot = pw / items.length, bw = Math.min(24, slot * 0.55);
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': cfg.aria });
+    s.append(svg('line', { x1: m.l, x2: m.l + pw, y1: m.t + ph, y2: m.t + ph, style: 'stroke:var(--axis);stroke-width:1' }));
+    items.forEach((it, i) => {
+      const cx = m.l + slot * (i + 0.5), h = it.count ? Math.max(3, (it.count / max) * ph) : 0, x = cx - bw / 2, y = m.t + ph - h, r = Math.min(4, h);
+      const color = Array.isArray(cfg.colors) ? cfg.colors[i] : cfg.color;
+      const bar = svg('path', { d: `M${x},${y + h}L${x},${y + r}Q${x},${y} ${x + r},${y}L${x + bw - r},${y}Q${x + bw},${y} ${x + bw},${y + r}L${x + bw},${y + h}Z`, style: `fill:${color}` });
+      s.append(bar);
+      s.append(svg('text', { x: cx, y: y - 7, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 600, style: 'fill:var(--ink)', text: fmt0(it.count) }));
+      s.append(svg('text', { x: cx, y: H - 10, 'text-anchor': 'middle', 'font-size': 11, style: 'fill:var(--ink2)', text: it.label }));
+      const hit = svg('rect', { x: m.l + slot * i, y: m.t, width: slot, height: ph + 2, fill: 'transparent', tabindex: '0', 'aria-label': `${it.label}: ${it.count} ${cfg.unit}` });
+      const show = (px, py) => { bar.classList.add('hot'); showTip(`${it.label} ${cfg.axis}`, [{ color, value: fmt0(it.count), name: cfg.unit }], px, py); };
+      const off = () => { bar.classList.remove('hot'); hideTip(); };
+      hit.addEventListener('pointermove', (e) => show(e.clientX, e.clientY));
+      hit.addEventListener('pointerleave', off);
+      hit.addEventListener('focus', () => show(...focusPoint(bar)));
+      hit.addEventListener('blur', off);
+      s.append(hit);
+    });
+    host.append(s);
+  }
+
+  // ---------- Barras horizontales ordenadas ----------
+  function rankedBars(host, rows, cfg) {
+    host.replaceChildren();
+    if (!rows.length) { host.append(el('p', { class: 'alerts-empty', text: cfg.empty })); return; }
+    const max = Math.max(...rows.map((r) => r.value));
+    host.style.setProperty('--lw', cfg.labelWidth || '45%');
+    for (const r of rows) {
+      const w = (r.value / max) * 80;
+      const bar = el('div', { class: 'rb-b', style: `width:${w}%` });
+      const val = el('span', { class: 'rb-v', text: r.valueText, style: `left:calc(${w}% + 8px)` });
+      const row = el('div', { class: 'rb', tabindex: '0', 'aria-label': `${r.label}: ${r.valueText}` },
+        el('span', { class: 'rb-l', text: r.label, title: r.label }), el('div', { class: 'rb-t' }, bar, val));
+      const show = (x, y) => showTip(r.label, [{ color: 'var(--c1)', value: r.valueText, name: r.sub || '' }], x, y);
+      row.addEventListener('pointermove', (e) => show(e.clientX, e.clientY));
+      row.addEventListener('pointerleave', hideTip);
+      row.addEventListener('focus', () => show(...focusPoint(bar)));
+      row.addEventListener('blur', hideTip);
+      host.append(row);
+    }
+  }
+
+  // ---------- Mapa de calor (día × hora) ----------
+  function heatmap(host, hm) {
+    host.replaceChildren();
+    const W = Math.max(280, host.clientWidth), left = 34, top = 18, gap = 2;
+    const cw = (W - left - 4) / 24, ch = Math.max(14, Math.min(26, cw)), H = top + 7 * (ch + gap);
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Mapa de calor de llegadas a urgencias por día de la semana y hora' });
+    for (let h = 0; h < 24; h += 3) s.append(svg('text', { x: left + h * cw + (cw - gap) / 2, y: 11, 'text-anchor': 'middle', 'font-size': 10, style: 'fill:var(--ink2)', text: String(h) }));
+    const bin = (v) => (v <= 0 ? 0 : Math.min(5, Math.ceil((v / hm.max) * 5)));
+    hm.matrix.forEach((row, d) => {
+      s.append(svg('text', { x: left - 6, y: top + d * (ch + gap) + ch / 2 + 4, 'text-anchor': 'end', 'font-size': 11, style: 'fill:var(--ink2)', text: hm.weekdays[d] }));
+      row.forEach((v, h) => {
+        const cell = svg('rect', { x: left + h * cw, y: top + d * (ch + gap), width: Math.max(1, cw - gap), height: ch, rx: 2, style: `fill:var(--seq-${bin(v)})`, tabindex: '0', 'aria-label': `${hm.weekdays[d]} ${h}:00, ${v} llegadas` });
+        const show = (x, y) => { cell.classList.add('hot'); showTip(`${WEEKDAYS_LONG[d]} ${String(h).padStart(2, '0')}:00–${String(h).padStart(2, '0')}:59`, [{ color: `var(--seq-${Math.max(1, bin(v))})`, value: fmt0(v), name: v === 1 ? 'llegada' : 'llegadas' }], x, y); };
+        const off = () => { cell.classList.remove('hot'); hideTip(); };
+        cell.addEventListener('pointermove', (e) => show(e.clientX, e.clientY));
+        cell.addEventListener('pointerleave', off);
+        cell.addEventListener('focus', () => show(...focusPoint(cell)));
+        cell.addEventListener('blur', off);
+        s.append(cell);
+      });
+    });
+    host.append(s);
+    const legend = el('div', { class: 'heat-legend' }, el('span', { text: '0' }));
+    for (let b = 0; b <= 5; b++) legend.append(el('i', { style: `background:var(--seq-${b})` }));
+    legend.append(el('span', { text: `${fmt0(hm.max)} llegadas en una hora (máximo)` }));
+    host.append(legend);
+  }
+
+  // ---------- Mini gráfico de tendencia ----------
+  function sparkline(host, values) {
+    host.replaceChildren();
+    const W = Math.max(120, host.clientWidth), H = 36, max = Math.max(1, ...values), min = Math.min(...values);
+    const X = (i) => 3 + ((W - 6) * i) / Math.max(1, values.length - 1), Y = (v) => H - 5 - ((v - min) / Math.max(1, max - min)) * (H - 12);
+    const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Tendencia diaria de atenciones' });
+    s.append(svg('path', { d: values.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(''), fill: 'none', 'stroke-width': 2, 'stroke-linejoin': 'round', style: 'stroke:var(--muted)' }));
+    s.append(svg('circle', { cx: X(values.length - 1), cy: Y(values[values.length - 1]), r: 4, 'stroke-width': 2, style: 'fill:var(--c1);stroke:var(--surface)' }));
+    host.append(s);
+  }
+
+  // ---------- Tarjetas de indicadores ----------
+  function deltaNode(delta, { unit = '%', upIs = 'bad', pp = false } = {}) {
+    if (delta == null) return el('div', { class: 'delta none', text: 'Sin período anterior para comparar' });
+    if (delta === 0) return el('div', { class: 'delta neutral', text: '— igual que el período anterior' });
+    const up = delta > 0, cls = upIs === 'neutral' ? 'neutral' : (up === (upIs === 'good') ? 'good' : 'bad');
+    const text = `${up ? '▲ +' : '▼ −'}${fmt1(Math.abs(delta))}${pp ? ' pp' : ' %'} vs período anterior`;
+    return el('div', { class: `delta ${cls}`, text });
+  }
+  function tile(label, value, unit, ...extra) {
+    return el('div', { class: 'tile' }, el('div', { class: 'label', text: label }),
+      el('div', { class: 'value' }, document.createTextNode(value), unit ? el('small', { text: unit }) : null), ...extra);
+  }
+  function renderKpis(d) {
+    const k = d.kpis, box = $('#kpis');
+    const hero = el('div', { class: 'tile hero' }, el('div', { class: 'label', text: `Atenciones (${d.days} días)` }),
+      el('div', { class: 'value', text: fmt0(k.encounters.value) }), deltaNode(k.encounters.delta, { upIs: 'neutral' }));
+    const spark = el('div', { class: 'spark' }); hero.append(spark);
+
+    const occ = k.occupancy_now.value, level = occ >= 95 ? 'critical' : occ >= 85 ? 'warning' : 'ok';
+    const fill = level === 'critical' ? 'var(--critical)' : level === 'warning' ? 'var(--warning)' : 'var(--c1)';
+    const badge = level === 'critical' ? el('span', { class: 'badge critical' }, el('span', { class: 'ico', text: '⛔' }), 'Sobre la capacidad segura')
+      : level === 'warning' ? el('span', { class: 'badge warning' }, el('span', { class: 'ico', text: '⚠' }), 'Ocupación alta')
+      : el('span', { class: 'badge good' }, el('span', { class: 'ico', text: '✔' }), 'Dentro de lo esperado');
+    const meter = el('div', { class: 'meter', role: 'img', 'aria-label': `Ocupación ${fmt1(occ)} por ciento` }, el('i', { style: `width:${Math.min(100, occ)}%;background:${fill}` }));
+    const tOcc = tile('Ocupación de camas ahora', fmt1(occ), '%', meter,
+      el('div', { class: 'note', text: `${k.occupancy_now.census} de ${k.occupancy_now.capacity} camas` }), badge,
+      deltaNode(k.occupancy_avg.delta_pp, { pp: true }));
+    tOcc.querySelector('.delta').prepend(document.createTextNode('Promedio del período · '));
+
+    const tStay = tile('Estadía promedio', k.avg_stay.value == null ? '—' : fmt1(k.avg_stay.value), 'días', deltaNode(k.avg_stay.delta));
+    const w = k.er_wait;
+    const tWait = tile('Espera mediana en urgencias', w.median == null ? '—' : fmt0(w.median), 'min', deltaNode(w.delta),
+      el('div', { class: 'note', text: w.p90 == null ? '' : `P90 ${fmt0(w.p90)} min · ${fmt0(w.within60)} % atendidos en ≤ 60 min` }));
+    const tRe = tile('Reingreso a 30 días', k.readmission.value == null ? '—' : fmt1(k.readmission.value), '%', deltaNode(k.readmission.delta_pp, { pp: true }));
+    const tCrit = tile('Alertas críticas', fmt0(k.critical.value), 'en el período', el('div', { class: 'note', text: `${d.alerts.length ? 'Últimas en la tabla de abajo' : 'Sin alertas en los últimos 7 días'}` }));
+    box.replaceChildren(hero, tOcc, tStay, tWait, tRe, tCrit);
+    sparkline(spark, d.daily.EMER.map((v, i) => v + d.daily.AMB[i] + d.daily.IMP[i]));
+  }
+
+  function renderAlerts(d) {
+    const host = $('#alerts');
+    if (!d.alerts.length) { host.replaceChildren(el('p', { class: 'alerts-empty', text: 'Sin signos vitales críticos en los últimos 7 días.' })); return; }
+    const body = el('tbody');
+    for (const a of d.alerts) {
+      const when = new Date(a.when), pad = (x) => String(x).padStart(2, '0');
+      const low = a.level === 'LL';
+      body.append(el('tr', {},
+        el('td', { text: `${when.getDate()} ${MONTHS[when.getMonth()]} ${pad(when.getHours())}:${pad(when.getMinutes())}` }),
+        el('td', {}, a.patient_id ? el('a', { href: `/Patient/${a.patient_id}`, target: '_blank', rel: 'noopener', text: a.patient }) : a.patient),
+        el('td', { text: a.test }), el('td', { class: 'num', text: a.value }),
+        el('td', {}, el('span', { class: 'lvl' }, el('span', { 'aria-hidden': 'true', text: low ? '▼' : '▲' }), low ? 'Crítico bajo' : 'Crítico alto'))));
+    }
+    host.replaceChildren(el('div', { class: 'tableview alerts' }, el('table', {},
+      el('thead', {}, el('tr', {}, ...['Fecha', 'Paciente', 'Examen'].map((t) => el('th', { text: t })), el('th', { class: 'num', text: 'Valor' }), el('th', { text: 'Nivel' }))), body)));
+    host.firstChild.style.maxHeight = 'none';
+  }
+
+  // ---------- Vista de tabla (alternativa accesible a cada gráfico) ----------
+  function fillTable(card, headers, rows) {
+    const tv = $('.tableview', card);
+    tv.replaceChildren(el('table', {}, el('thead', {}, el('tr', {}, ...headers.map((h, i) => el('th', { class: i ? 'num' : '', text: h })))),
+      el('tbody', {}, ...rows.map((r) => el('tr', {}, ...r.map((c, i) => el('td', { class: i && typeof c === 'string' && /^[\d.,\s%–-]+$/.test(c) ? 'num' : '', text: String(c) })))))));
+  }
+  for (const card of document.querySelectorAll('.card[data-chart]')) {
+    const btn = $('.tbtn', card);
+    btn.addEventListener('click', () => {
+      const on = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', on); btn.textContent = on ? 'Ver gráfico' : 'Ver tabla';
+      $('.viz', card).hidden = on; $('.tableview', card).hidden = !on;
+      if ($('.legend', card)) $('.legend', card).hidden = on;
+      if (!on) renderCharts();
+    });
+  }
+
+  // ---------- Render general ----------
+  function renderCharts() {
+    const d = state.data; if (!d) return;
+    const dates = d.daily.dates;
+    const total = d.daily.EMER.reduce((a, v, i) => a + v + d.daily.AMB[i] + d.daily.IMP[i], 0);
+    const series = ['EMER', 'AMB', 'IMP'].map((k) => ({ key: k, name: CLASS[k].name, color: CLASS[k].color, values: d.daily[k] }));
+    $('#lg-daily').replaceChildren(...series.map((s) => el('span', {}, el('i', { style: `background:${s.color}` }), s.name)));
+    if (!$('#v-daily').hidden) lineChart($('#v-daily'), { labels: dates, series, endLabels: true, aria: `Atenciones por día, ${fmt0(total)} en total`, tipFmt: (v) => fmt0(v) });
+    fillTable($('[data-chart="daily"]'), ['Fecha', ...series.map((s) => s.name)], dates.map((dt, i) => [dayLabel(dt), ...series.map((s) => s.values[i])]));
+
+    const occCard = $('[data-chart="occ"]');
+    if (!$('#v-occ').hidden) lineChart($('#v-occ'), { labels: dates, series: [{ name: 'Ocupación', color: 'var(--c3)', values: d.daily.occupancy }], area: true, minMax: 100, ref: { value: 85, label: 'Umbral de alerta 85 %' }, yFmt: (v) => `${fmt0(v)} %`, endLabels: false, aria: 'Ocupación diaria de camas', tipFmt: (v) => `${fmt1(v)} %` });
+    fillTable(occCard, ['Fecha', 'Ocupación (%)'], dates.map((dt, i) => [dayLabel(dt), fmt1(d.daily.occupancy[i])]));
+
+    const hm = d.heatmap;
+    if (!$('#v-heat').hidden) heatmap($('#v-heat'), hm);
+    fillTable($('[data-chart="heat"]'), ['Día', ...Array.from({ length: 24 }, (_, h) => `${h} h`)], hm.matrix.map((row, i) => [hm.weekdays[i], ...row]));
+
+    const w = d.er_wait_hist;
+    if (!$('#v-wait').hidden) columns($('#v-wait'), w, { color: 'var(--c1)', unit: 'atenciones', axis: 'min', aria: 'Distribución de la espera en urgencias' });
+    fillTable($('[data-chart="wait"]'), ['Espera (min)', 'Atenciones'], w.map((x) => [x.label, x.count]));
+    const st = d.stay_hist;
+    if (!$('#v-stay').hidden) columns($('#v-stay'), st, { color: 'var(--c3)', unit: 'altas', axis: 'días', aria: 'Distribución de la estadía hospitalaria' });
+    fillTable($('[data-chart="stay"]'), ['Estadía (días)', 'Altas'], st.map((x) => [x.label, x.count]));
+    const ag = d.age_bands;
+    if (!$('#v-age').hidden) columns($('#v-age'), ag, { colors: ['var(--ord-1)', 'var(--ord-2)', 'var(--ord-3)', 'var(--ord-4)', 'var(--ord-5)'], unit: 'pacientes', axis: 'años', aria: 'Pacientes atendidos por tramo de edad' });
+    fillTable($('[data-chart="age"]'), ['Edad (años)', 'Pacientes'], ag.map((x) => [x.label, x.count]));
+
+    const dx = d.top_diagnoses;
+    if (!$('#v-dx').hidden) rankedBars($('#v-dx'), dx.map((x) => ({ label: `${x.code} · ${x.label}`, value: x.count, valueText: fmt0(x.count), sub: `${fmt1(x.pct)} % de los diagnósticos` })), { labelWidth: '52%', empty: 'Sin diagnósticos en el período.' });
+    fillTable($('[data-chart="dx"]'), ['Código', 'Diagnóstico', 'Casos', '%'], dx.map((x) => [x.code, x.label, x.count, fmt1(x.pct)]));
+    const im = d.imaging;
+    if (!$('#v-img').hidden) rankedBars($('#v-img'), im.map((x) => ({ label: x.label, value: x.count, valueText: fmt0(x.count), sub: x.modality })), { labelWidth: '32%', empty: 'Sin estudios de imagen en el período.' });
+    fillTable($('[data-chart="img"]'), ['Modalidad', 'Código', 'Estudios'], im.map((x) => [x.label, x.modality, x.count]));
+  }
+
+  function render(d) {
+    renderKpis(d); renderAlerts(d); renderCharts();
+    $('#d-wait').textContent = d.kpis.er_wait.median == null ? 'Minutos desde la llegada hasta ser atendido' : `Mediana ${fmt0(d.kpis.er_wait.median)} min · minutos desde la llegada hasta ser atendido`;
+    const t = d.totals, from = dayLabel(d.range.from), to = dayLabel(d.range.to);
+    $('#footer').textContent = `Período: ${from} al ${to}. Datos totales en el servidor: ${fmt0(t.patients)} pacientes, ${fmt0(t.encounters)} atenciones, ${fmt0(t.observations)} observaciones, ${fmt0(t.conditions)} diagnósticos y ${fmt0(t.imaging_studies)} estudios de imagen. Proyecto educativo con datos ficticios.`;
+    $('#banner').replaceChildren(d.synthetic_resources ? el('div', { class: 'banner', text: `Mostrando datos de demostración (${fmt0(d.synthetic_resources)} recursos ficticios generados). Los datos reales que subas (HL7 / DICOM) se suman a estos.` }) : '');
+  }
+
+  // ---------- Carga de datos ----------
+  async function load() {
+    const seq = ++state.seq, main = $('#content');
+    main.classList.add('loading');
+    try {
+      const r = await fetch(`/dashboard/data?days=${state.days}&capacity=${state.capacity}`);
+      if (!r.ok) throw new Error(`Error ${r.status}`);
+      const d = await r.json();
+      if (seq !== state.seq) return;
+      state.data = d;
+      const empty = d.totals.encounters === 0;
+      $('#empty').hidden = !empty; main.hidden = empty;
+      if (!empty) render(d); else $('#banner').replaceChildren();
+      $('#status').textContent = `Actualizado ${new Date(d.generated_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`;
+    } catch (e) {
+      $('#banner').replaceChildren(el('div', { class: 'banner err', text: `No se pudieron cargar los indicadores: ${e.message}` }));
+    } finally { main.classList.remove('loading'); }
+  }
+
+  async function seed() {
+    for (const b of [$('#seedBtn'), $('#seedBtn2')]) b.disabled = true;
+    $('#status').textContent = 'Generando datos de demostración…';
+    try { const r = await fetch('/dashboard/seed', { method: 'POST' }); if (!r.ok) throw new Error(`Error ${r.status}`); await load(); }
+    catch (e) { $('#banner').replaceChildren(el('div', { class: 'banner err', text: `No se pudieron generar los datos: ${e.message}` })); }
+    for (const b of [$('#seedBtn'), $('#seedBtn2')]) b.disabled = false;
+  }
+  $('#seedBtn').addEventListener('click', seed);
+  $('#seedBtn2').addEventListener('click', seed);
+  $('#clearBtn').addEventListener('click', async () => {
+    if (!confirm('¿Borrar los datos de demostración? Los datos reales (HL7 y DICOM) no se tocan.')) return;
+    await fetch('/dashboard/seed', { method: 'DELETE' }); await load();
+  });
+
+  // ---------- Filtros y tema ----------
+  for (const b of document.querySelectorAll('#period button')) {
+    b.addEventListener('click', () => {
+      state.days = +b.dataset.days; store.set('hub.days', state.days);
+      for (const o of document.querySelectorAll('#period button')) o.setAttribute('aria-pressed', o === b);
+      load();
+    });
+  }
+  let capTimer = 0;
+  $('#cap').addEventListener('input', (e) => {
+    const v = Math.max(1, Math.min(5000, +e.target.value || 0)); if (!v) return;
+    state.capacity = v; store.set('hub.cap', v); clearTimeout(capTimer); capTimer = setTimeout(load, 350);
+  });
+  const THEMES = ['auto', 'light', 'dark'], LABEL = { auto: 'auto', light: 'claro', dark: 'oscuro' };
+  function applyTheme(t) {
+    if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = t;
+    $('#themeBtn').textContent = `Tema: ${LABEL[t]}`; store.set('hub.theme', t);
+  }
+  let theme = THEMES.includes(store.get('hub.theme', 'auto')) ? store.get('hub.theme', 'auto') : 'auto';
+  applyTheme(theme);
+  $('#themeBtn').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); });
+
+  const savedDays = +store.get('hub.days', 30), savedCap = +store.get('hub.cap', 60);
+  state.days = [7, 30, 90].includes(savedDays) ? savedDays : 30; state.capacity = savedCap >= 1 ? savedCap : 60;
+  $('#cap').value = state.capacity;
+  for (const o of document.querySelectorAll('#period button')) o.setAttribute('aria-pressed', +o.dataset.days === state.days);
+
+  let rz = 0;
+  new ResizeObserver(() => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (state.data && !$('#content').hidden) { renderCharts(); const s = $('.spark'); if (s) sparkline(s, state.data.daily.EMER.map((v, i) => v + state.data.daily.AMB[i] + state.data.daily.IMP[i])); } }); }).observe(document.body);
+  load();
+})();
+</script>
+</body>
+</html>
